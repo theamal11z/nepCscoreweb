@@ -12,6 +12,9 @@ import AboutPage from "@/pages/about-page";
 import MatchDetail from "@/pages/match-detail";
 import PlayerProfile from "@/pages/player-profile";
 import AdminPanel from "@/pages/admin-panel";
+import TeamManagement from "@/pages/team-management";
+import MatchManagement from "@/pages/match-management";
+import LiveScoring from "@/pages/live-scoring";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,7 +24,10 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/dashboard" component={HomePage} />
+      <ProtectedRoute path="/teams" component={TeamManagement} />
+      <ProtectedRoute path="/matches" component={MatchManagement} />
       <ProtectedRoute path="/match/:id" component={MatchDetail} />
+      <ProtectedRoute path="/match/:id/scoring" component={LiveScoring} />
       <ProtectedRoute path="/player/:id" component={PlayerProfile} />
       <ProtectedRoute path="/admin" component={AdminPanel} />
       <Route component={NotFound} />
