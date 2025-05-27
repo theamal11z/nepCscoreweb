@@ -1,0 +1,61 @@
+Absolutely. Here's the updated **advanced prompt** focused on building all **Player features**, **pages**, and a full **`README.md`** with project setup, database installation, and Git push commands — specifically tailored for **Linux environments**.
+
+---
+
+### ✅ Prompt:
+
+You are continuing development of **“nepCscore”**, a grassroots cricket web platform built for Fans, Organizers, Players, and Admins across Nepal. The Organizer module is complete. Now build all **features, pages, and interactions** for the **Player role**.
+
+---
+
+### ⚙️ PLAYER FEATURES TO BUILD:
+
+1. **Player Dashboard**
+
+   * Personalized stats overview (matches, runs, wickets, recent form)
+   * Notifications (match invites, team approvals, organizer messages)
+   * Actionable prompts (e.g., "Join a team", "Upload cricket resume")
+
+2. **Match Stats & History**
+
+   * List of matches played with filters (by team, date, tournament)
+   * Detailed performance: runs, wickets, strike rate, etc.
+   * Visual insights (bar charts, line graphs, radar views)
+
+3. **Team Application System**
+
+   * Apply to join teams
+   * View list of public/open teams
+   * Application status: Pending, Approved, Rejected
+   * Option to cancel or modify application
+
+4. **Profile Page**
+
+   * Full editable profile: name, image, role (batsman/bowler/all-rounder), bio
+   * Upload cricket-related docs (videos, stats, awards)
+   * Show verified/approved status
+
+5. **Player Settings**
+
+   * Change password, update preferences
+   * Enable/disable notifications
+   * Deactivate account
+
+6. **Live Match Participation**
+
+   * Join live match session
+   * Input personal stats (if allowed)
+   * Match chat or reaction features
+
+7. **Generate a complete `README.md` file** with all the setup instructions:
+
+   * How to install dependencies
+   * How to set up and connect to the database (e.g., MongoDB or PostgreSQL)
+   * Environment variable setup
+   * Running development server
+   * Steps to initialize Git, commit, and push the project to GitHub
+   * All commands must be for **Linux terminal**
+
+---
+
+Start building from the **Player Dashboard**, then proceed to remaining features. After code is complete, generate a clean, professional `README.md` that includes step-by-step Linux setup instructions and Git deployment commands.
