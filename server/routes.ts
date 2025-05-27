@@ -65,6 +65,15 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/teams/my", requireAuth, async (req, res) => {
+    try {
+      const teams = await storage.getUserTeams(req.user.id);
+      res.json(teams);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user teams" });
+    }
+  });
+
   // Matches
   app.get("/api/matches", async (req, res) => {
     try {
@@ -112,6 +121,30 @@ export function registerRoutes(app: Express): Server {
       res.json(match);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch match" });
+    }
+  });
+
+  app.get("/api/matches/organizer", requireAuth, async (req, res) => {
+    try {
+      const matches = await storage.getUserMatches(req.user.id);
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch organizer matches" });
+    }
+  });
+
+  app.get("/api/matches/scores", async (req, res) => {
+    try {
+      const matches = await storage.getAllMatches();
+      const matchesWithScores = await Promise.all(
+        matches.map(async (match) => {
+          const scores = await storage.getMatchScores(match.id);
+          return { ...match, scores };
+        })
+      );
+      res.json(matchesWithScores);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch matches with scores" });
     }
   });
 
