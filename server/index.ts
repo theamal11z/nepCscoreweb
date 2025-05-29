@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -21,8 +22,27 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      
+      // Add response summary without sensitive data
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // Create a sanitized copy of the response
+        const sanitizedResponse = { ...capturedJsonResponse };
+        
+        // Redact sensitive fields
+        if (sanitizedResponse.password) sanitizedResponse.password = '[REDACTED]';
+        if (sanitizedResponse.id && path.includes('/user')) {
+          // Just indicate this is a user object without details
+          logLine += ` :: { type: 'user', id: ${sanitizedResponse.id} }`;
+        } else if (res.statusCode >= 400) {
+          // For errors, just log the error message
+          logLine += ` :: ${JSON.stringify({ message: sanitizedResponse.message || 'Error' })}`;
+        } else if (Array.isArray(sanitizedResponse)) {
+          // For arrays, just log the count
+          logLine += ` :: Array[${sanitizedResponse.length}]`;
+        } else {
+          // For other responses, log that a response was sent but don't include details
+          logLine += ` :: [Response sent]`;
+        }
       }
 
       if (logLine.length > 80) {
@@ -37,6 +57,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Test database connection
+  const { testDatabaseConnection } = await import('./db');
+  await testDatabaseConnection();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

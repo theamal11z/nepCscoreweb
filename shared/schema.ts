@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -90,11 +90,38 @@ export const ballByBall = pgTable("ball_by_ball", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+// Fan following tables
+export const teamFollows = pgTable("team_follows", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  teamId: integer("team_id").references(() => teams.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => {
+  return {
+    // Ensure a user can follow a team only once
+    uniqUserTeam: unique().on(table.userId, table.teamId),
+  };
+});
+
+export const playerFollows = pgTable("player_follows", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  playerId: integer("player_id").references(() => players.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => {
+  return {
+    // Ensure a user can follow a player only once
+    uniqUserPlayer: unique().on(table.userId, table.playerId),
+  };
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   teamsCreated: many(teams),
   matchesOrganized: many(matches),
   playerProfile: many(players),
+  teamFollows: many(teamFollows),
+  playerFollows: many(playerFollows),
 }));
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -106,6 +133,7 @@ export const teamsRelations = relations(teams, ({ one, many }) => ({
   homeMatches: many(matches, { relationName: "team1" }),
   awayMatches: many(matches, { relationName: "team2" }),
   scores: many(matchScores),
+  followers: many(teamFollows),
 }));
 
 export const playersRelations = relations(players, ({ one, many }) => ({
@@ -120,6 +148,7 @@ export const playersRelations = relations(players, ({ one, many }) => ({
   stats: many(playerStats),
   ballsAsBatsman: many(ballByBall, { relationName: "batsman" }),
   ballsAsBowler: many(ballByBall, { relationName: "bowler" }),
+  followers: many(playerFollows),
 }));
 
 export const matchesRelations = relations(matches, ({ one, many }) => ({
@@ -189,6 +218,28 @@ export const ballByBallRelations = relations(ballByBall, ({ one }) => ({
   }),
 }));
 
+export const teamFollowsRelations = relations(teamFollows, ({ one }) => ({
+  user: one(users, {
+    fields: [teamFollows.userId],
+    references: [users.id],
+  }),
+  team: one(teams, {
+    fields: [teamFollows.teamId],
+    references: [teams.id],
+  }),
+}));
+
+export const playerFollowsRelations = relations(playerFollows, ({ one }) => ({
+  user: one(users, {
+    fields: [playerFollows.userId],
+    references: [users.id],
+  }),
+  player: one(players, {
+    fields: [playerFollows.playerId],
+    references: [players.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -211,13 +262,21 @@ export const insertPlayerSchema = createInsertSchema(players).pick({
   bowlingStyle: true,
 });
 
-export const insertMatchSchema = createInsertSchema(matches).pick({
-  team1Id: true,
-  team2Id: true,
-  venue: true,
-  matchDate: true,
-  matchType: true,
-});
+export const insertMatchSchema = createInsertSchema(matches)
+  .omit({
+    id: true,
+    createdAt: true,
+    winnerId: true,
+    status: true,
+    organizerId: true,
+    matchDate: true, // We'll extend with our own version
+  })
+  .extend({
+    // Override matchDate to accept string ISO format
+    matchDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+      message: "Invalid date format. Please provide a valid ISO date string."
+    })
+  });
 
 export const insertMatchScoreSchema = createInsertSchema(matchScores).pick({
   matchId: true,
@@ -229,14 +288,23 @@ export const insertMatchScoreSchema = createInsertSchema(matchScores).pick({
   extras: true,
 });
 
-export const insertPlayerStatSchema = createInsertSchema(playerStats).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertPlayerStatSchema = createInsertSchema(playerStats).omit([
+  "id",
+  "createdAt"
+]);
 
 export const insertBallByBallSchema = createInsertSchema(ballByBall).omit({
   id: true,
-  timestamp: true,
+  timestamp: true
+});
+
+// Fan following schemas
+export const insertTeamFollowSchema = createInsertSchema(teamFollows).pick({
+  teamId: true,
+});
+
+export const insertPlayerFollowSchema = createInsertSchema(playerFollows).pick({
+  playerId: true,
 });
 
 // Types
@@ -254,3 +322,7 @@ export type InsertPlayerStat = z.infer<typeof insertPlayerStatSchema>;
 export type PlayerStat = typeof playerStats.$inferSelect;
 export type InsertBallByBall = z.infer<typeof insertBallByBallSchema>;
 export type BallByBall = typeof ballByBall.$inferSelect;
+export type InsertTeamFollow = z.infer<typeof insertTeamFollowSchema>;
+export type TeamFollow = typeof teamFollows.$inferSelect;
+export type InsertPlayerFollow = z.infer<typeof insertPlayerFollowSchema>;
+export type PlayerFollow = typeof playerFollows.$inferSelect;

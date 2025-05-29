@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import MatchCard from "@/components/match-card";
-import { Heart, TrendingUp, Users, Trophy, Calendar, Clock, MapPin } from "lucide-react";
-import type { Match, MatchScore } from "@shared/schema";
+import { Heart, TrendingUp, Users, User, Trophy, Calendar, Clock, MapPin } from "lucide-react";
+import type { Match, MatchScore, Team, Player } from "@shared/schema";
+import { Link } from "wouter";
 
 export default function FanDashboard() {
   const { data: liveMatches, isLoading: liveLoading } = useQuery<Match[]>({
@@ -21,6 +22,14 @@ export default function FanDashboard() {
 
   const { data: allScores, isLoading: scoresLoading } = useQuery<MatchScore[]>({
     queryKey: ["/api/matches/scores"],
+  });
+
+  const { data: followedTeams, isLoading: teamsLoading } = useQuery<Team[]>({
+    queryKey: ["/api/users/me/teams/following"],
+  });
+
+  const { data: followedPlayers, isLoading: playersLoading } = useQuery<Player[]>({
+    queryKey: ["/api/users/me/players/following"],
   });
 
   const getMatchScores = (matchId: number) => {
@@ -72,7 +81,9 @@ export default function FanDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Teams Following</p>
-                <p className="text-3xl font-bold text-primary">8</p>
+                <p className="text-3xl font-bold text-primary">
+                  {followedTeams?.length || 0}
+                </p>
               </div>
               <Heart className="w-12 h-12 text-pink-500" />
             </div>
@@ -84,7 +95,9 @@ export default function FanDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Players Following</p>
-                <p className="text-3xl font-bold text-primary">15</p>
+                <p className="text-3xl font-bold text-primary">
+                  {followedPlayers?.length || 0}
+                </p>
               </div>
               <Users className="w-12 h-12 text-green-500" />
             </div>
@@ -185,40 +198,110 @@ export default function FanDashboard() {
         <div className="space-y-6">
           {/* Following Teams */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle>Teams You Follow</CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/fan-following?tab=teams">View All</Link>
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="text-center py-8">
-                  <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground text-sm">
-                    Start following teams to see them here
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Browse Teams
-                  </Button>
-                </div>
+                {teamsLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="animate-pulse flex items-center">
+                        <div className="h-10 w-10 bg-muted rounded-md mr-3"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-muted rounded mb-2"></div>
+                          <div className="h-3 bg-muted rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : followedTeams && followedTeams.length > 0 ? (
+                  <div className="space-y-3">
+                    {followedTeams.slice(0, 3).map((team) => (
+                      <div key={team.id} className="flex items-center p-2 rounded-lg border hover:bg-accent">
+                        <div className="h-10 w-10 bg-muted rounded-md flex items-center justify-center mr-3">
+                          {team.logoUrl ? (
+                            <img src={team.logoUrl} alt={team.name} className="h-8 w-8 object-contain" />
+                          ) : (
+                            <Users className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <Link href={`/team/${team.id}`}>
+                            <h4 className="font-medium hover:text-primary">{team.name}</h4>
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{team.location}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground text-sm">
+                      Start following teams to see them here
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-2" asChild>
+                      <Link href="/teams-browse">Browse Teams</Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Following Players */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle>Players You Follow</CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/fan-following?tab=players">View All</Link>
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="text-center py-8">
-                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground text-sm">
-                    Start following players to track their performance
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Browse Players
-                  </Button>
-                </div>
+                {playersLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="animate-pulse flex items-center">
+                        <div className="h-10 w-10 bg-muted rounded-full mr-3"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-muted rounded mb-2"></div>
+                          <div className="h-3 bg-muted rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : followedPlayers && followedPlayers.length > 0 ? (
+                  <div className="space-y-3">
+                    {followedPlayers.slice(0, 3).map((player) => (
+                      <div key={player.id} className="flex items-center p-2 rounded-lg border hover:bg-accent">
+                        <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center mr-3">
+                          <User className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <Link href={`/player/${player.id}`}>
+                            <h4 className="font-medium hover:text-primary">Player #{player.userId}</h4>
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{player.position || 'Player'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground text-sm">
+                      Start following players to track their performance
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-2" asChild>
+                      <Link href="/players-browse">Browse Players</Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

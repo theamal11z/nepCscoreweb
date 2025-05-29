@@ -114,23 +114,71 @@ export default function OrganizerDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Welcome back, {user?.fullName}!
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Here's what's happening with your cricket tournaments today.
-            </p>
+        {/* Header with Profile */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          {/* Welcome and Actions */}
+          <div className="md:col-span-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Welcome back, {user?.fullName}!
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2 mb-4">
+                Here's what's happening with your cricket tournaments today.
+              </p>
+              <div className="flex space-x-3 mt-4">
+                <Link href="/matches">
+                  <Button className="bg-[#DC143C] hover:bg-[#B91C3C] text-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Match
+                  </Button>
+                </Link>
+                <Link href="/teams">
+                  <Button variant="outline">
+                    <Users className="h-4 w-4 mr-2" />
+                    Manage Teams
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </div>
-          <div className="flex space-x-3">
-            <Link href="/matches">
-              <Button className="bg-[#DC143C] hover:bg-[#B91C3C] text-white">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Match
-              </Button>
-            </Link>
+          
+          {/* Organizer Profile Card */}
+          <div className="md:col-span-1">
+            <Card className="border-0 shadow-sm h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl">Organizer Profile</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full bg-[#DC143C] flex items-center justify-center text-white text-2xl font-bold mb-3">
+                    {user?.fullName.split(' ').map(name => name[0]).join('').toUpperCase()}
+                  </div>
+                  <h3 className="font-bold text-lg">{user?.fullName}</h3>
+                  <Badge className="mt-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                    Organizer
+                  </Badge>
+                  
+                  <div className="w-full mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Tournaments</span>
+                      <span className="font-medium">3</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Teams</span>
+                      <span className="font-medium">{teams.length}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Matches</span>
+                      <span className="font-medium">{matches.length}</span>
+                    </div>
+                  </div>
+                  
+                  <Button variant="outline" className="w-full mt-4" asChild>
+                    <Link href="/profile">Edit Profile</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 

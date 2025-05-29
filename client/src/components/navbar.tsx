@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
-import { Bell, Home, Calendar, Users, BarChart3, Settings, LogOut, Menu } from "lucide-react";
+import { Bell, Home, Calendar, Users, BarChart3, Settings, LogOut, Menu, Trophy } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function Navbar() {
@@ -41,31 +41,103 @@ export default function Navbar() {
     }
   };
 
+  // Navigation items for all roles - role-specific dashboards
   const navigationItems = [
+    // Role-specific dashboard pages
     {
-      href: "/dashboard",
+      href: "/fan-dashboard",
       label: "Dashboard",
       icon: Home,
-      roles: ["fan", "organizer", "player", "admin"],
+      roles: ["fan"],
     },
     {
-      href: "/matches",
+      href: "/organizer-dashboard",
+      label: "Dashboard",
+      icon: Home,
+      roles: ["organizer"],
+    },
+    {
+      href: "/player-dashboard",
+      label: "Dashboard",
+      icon: Home,
+      roles: ["player"],
+    },
+    {
+      href: "/admin-dashboard",
+      label: "Dashboard",
+      icon: Home,
+      roles: ["admin"],
+    },
+    // Fan-specific pages
+    {
+      href: "/matches-browse",
       label: "Matches",
       icon: Calendar,
-      roles: ["fan", "organizer", "player", "admin"],
+      roles: ["fan"],
+    },
+    {
+      href: "/teams-browse",
+      label: "Teams",
+      icon: Users,
+      roles: ["fan"],
+    },
+    {
+      href: "/players-browse",
+      label: "Players",
+      icon: Users,
+      roles: ["fan"],
+    },
+    {
+      href: "/fan-following",
+      label: "Following",
+      icon: BarChart3,
+      roles: ["fan"],
+    },
+    // Organizer pages
+    {
+      href: "/matches",
+      label: "Manage Matches",
+      icon: Calendar,
+      roles: ["organizer"],
     },
     {
       href: "/teams",
-      label: "Teams",
+      label: "Manage Teams",
       icon: Users,
-      roles: ["fan", "organizer", "player", "admin"],
+      roles: ["organizer"],
+    },
+    {
+      href: "/tournaments",
+      label: "Tournaments",
+      icon: Trophy,
+      roles: ["organizer"],
     },
     {
       href: "/stats",
       label: "Statistics",
       icon: BarChart3,
-      roles: ["fan", "organizer", "player", "admin"],
+      roles: ["organizer"],
     },
+    // Player pages
+    {
+      href: "/matches",
+      label: "Matches",
+      icon: Calendar,
+      roles: ["player"],
+    },
+    {
+      href: "/teams",
+      label: "Teams",
+      icon: Users,
+      roles: ["player"],
+    },
+    {
+      href: "/stats",
+      label: "Statistics",
+      icon: BarChart3,
+      roles: ["player"],
+    },
+    // Admin pages
     {
       href: "/admin",
       label: "Admin Panel",
@@ -105,25 +177,32 @@ export default function Navbar() {
     <nav className="bg-white dark:bg-card border-b border-border fixed top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/dashboard">
+          {/* Logo - redirects to role-specific dashboard */}
+          <Link href={user.role === "fan" ? "/fan-dashboard" : 
+                 user.role === "organizer" ? "/organizer-dashboard" : 
+                 user.role === "player" ? "/player-dashboard" : 
+                 "/admin-dashboard"}>
             <div className="flex items-center">
               <div className="text-2xl font-bold text-primary">nepCscore</div>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-2">
+          <div className="hidden md:flex md:space-x-2">
             <NavItems />
           </div>
 
-          {/* Right side - User menu and mobile menu */}
+          {/* User menu and mobile menu */}
           <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="h-4 w-4" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
-            </Button>
+            {/* Notifications Bell - Only for fan users */}
+            {user.role === "fan" && (
+              <Link href="/notifications">
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 flex items-center justify-center text-[10px] text-white font-medium">3</span>
+                </Button>
+              </Link>
+            )}
 
             {/* User Menu */}
             <DropdownMenu>

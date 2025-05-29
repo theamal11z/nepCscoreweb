@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LiveScoring from "@/components/live-scoring";
-import { Calendar, MapPin, Users, Trophy, Clock, TrendingUp } from "lucide-react";
-import type { Match, MatchScore, BallByBall } from "@shared/schema";
+import MatchSummary from "@/components/match-summary";
+import PlayerMatchStats from "@/components/player-match-stats";
+import { Calendar, MapPin, Users, Trophy, Clock, TrendingUp, Share2, Heart } from "lucide-react";
+import type { Match, MatchScore, BallByBall, PlayerStat, Team } from "@shared/schema";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function MatchDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const { data: match, isLoading: matchLoading } = useQuery<Match>({
     queryKey: [`/api/matches/${id}`],
@@ -30,6 +34,14 @@ export default function MatchDetail() {
   const { data: latestBall } = useQuery<BallByBall>({
     queryKey: [`/api/matches/${id}/latest-ball`],
     refetchInterval: match?.status === "live" ? 5000 : false,
+  });
+  
+  const { data: playerStats } = useQuery<PlayerStat[]>({
+    queryKey: [`/api/matches/${id}/player-stats`],
+  });
+  
+  const { data: teams } = useQuery<Team[]>({
+    queryKey: ["/api/teams"],
   });
 
   if (matchLoading) {
@@ -84,46 +96,107 @@ export default function MatchDetail() {
       <Navbar />
       <div className="pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Match Header */}
-          <Card className="mb-8">
-            <CardHeader>
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold">Match Details</h1>
-                    {getStatusBadge(match.status)}
-                  </div>
-                  <div className="flex items-center gap-4 text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      {new Date(match.matchDate).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      {new Date(match.matchDate).toLocaleTimeString()}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {match.venue}
-                    </div>
-                    <Badge variant="outline">{match.matchType}</Badge>
-                  </div>
-                </div>
-                {canManageMatch && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      Edit Match
-                    </Button>
-                    {match.status === "scheduled" && (
-                      <Button size="sm">
-                        Start Match
+          {/* Match Header - Match Summary and Quick Actions */}
+          <div className="flex flex-col lg:flex-row justify-between items-start gap-8 mb-8">
+            <div className="w-full lg:w-2/3">
+              <h1 className="text-3xl font-bold mb-6">Match Details</h1>
+              <MatchSummary match={match} scores={scores} />
+            </div>
+            
+            <div className="w-full lg:w-1/3 space-y-4">
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-3">
+                  <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast({
+                      title: "Link copied",
+                      description: "Match link copied to clipboard",
+                    });
+                  }}>
+                    <Share2 className="h-4 w-4" />
+                    Share
+                  </Button>
+                  
+                  {/* Follow Teams Buttons */}
+                  {teams && (
+                    <>
+                      <Button variant="outline" size="sm" className="flex items-center gap-2">
+                        <Heart className="h-4 w-4" />
+                        Team 1
                       </Button>
-                    )}
+                      <Button variant="outline" size="sm" className="flex items-center gap-2">
+                        <Heart className="h-4 w-4" />
+                        Team 2
+                      </Button>
+                    </>
+                  )}
+                  
+                  {canManageMatch && match.status !== "completed" && (
+                    <Button variant="default" size="sm" className="col-span-2" asChild>
+                      <a href={`/match/${id}/scoring`}>Score This Match</a>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* Match Information Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Match Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="text-muted-foreground">Format</div>
+                    <div className="font-medium">{match.matchType.toUpperCase()}</div>
+                    
+                    <div className="text-muted-foreground">Venue</div>
+                    <div className="font-medium">{match.venue}</div>
+                    
+                    <div className="text-muted-foreground">Date</div>
+                    <div className="font-medium">{new Date(match.matchDate).toLocaleDateString()}</div>
+                    
+                    <div className="text-muted-foreground">Time</div>
+                    <div className="font-medium">
+                      {new Date(match.matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    
+                    <div className="text-muted-foreground">Status</div>
+                    <div>{getStatusBadge(match.status)}</div>
                   </div>
-                )}
-              </div>
-            </CardHeader>
-          </Card>
+                </CardContent>
+              </Card>
+              
+              {/* Live Updates Card - Only shown for live matches */}
+              {match.status === "live" && latestBall && (
+                <Card className="border-destructive">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                      <CardTitle className="text-lg">Live Updates</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="text-sm text-muted-foreground">Current Over</div>
+                      <div className="text-xl font-bold">Over {latestBall.over}.{latestBall.ball}</div>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-lg font-bold">
+                          {latestBall.runs} {latestBall.extras && latestBall.extras > 0 ? `+ ${latestBall.extras}` : ''}
+                        </Badge>
+                        {latestBall.isWicket && (
+                          <Badge variant="destructive">WICKET!</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
 
           {/* Teams and Scores */}
           <div className="grid lg:grid-cols-2 gap-8 mb-8">
@@ -150,12 +223,12 @@ export default function MatchDetail() {
                 <CardContent>
                   <div className="text-center">
                     <div className="text-4xl font-bold text-primary mb-2">
-                      {score.runs}/{score.wickets}
+                      {score.runs ?? 0}/{score.wickets ?? 0}
                     </div>
                     <div className="text-lg text-muted-foreground">
                       ({score.overs} overs)
                     </div>
-                    {score.extras > 0 && (
+                    {score.extras && score.extras > 0 && (
                       <div className="text-sm text-muted-foreground mt-2">
                         Extras: {score.extras}
                       </div>
@@ -183,37 +256,39 @@ export default function MatchDetail() {
                   <CardTitle>Match Summary</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {scoresLoading ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading scorecard...</p>
-                    </div>
-                  ) : scores && scores.length > 0 ? (
-                    <div className="space-y-4">
-                      {scores.map((score) => (
-                        <div key={score.id} className="p-4 border rounded-lg">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="font-semibold">Team {score.teamId} - Innings {score.innings}</h4>
-                              <p className="text-2xl font-bold text-primary">
-                                {score.runs}/{score.wickets} ({score.overs} overs)
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-muted-foreground">Run Rate</p>
-                              <p className="font-semibold">
-                                {score.overs !== "0.0" ? (score.runs / parseFloat(score.overs)).toFixed(2) : "0.00"}
-                              </p>
-                            </div>
-                          </div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">
+                          Team 1 {match.team1Id && `(ID: ${match.team1Id})`}
+                        </h3>
+                        <div className="text-sm text-muted-foreground">
+                          {scores?.find((s) => s.teamId === match.team1Id)?.runs ?? 0}/
+                          {scores?.find((s) => s.teamId === match.team1Id)?.wickets ?? 0} 
+                          ({scores?.find((s) => s.teamId === match.team1Id)?.overs ?? 0} overs)
                         </div>
-                      ))}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">
+                          Team 2 {match.team2Id && `(ID: ${match.team2Id})`}
+                        </h3>
+                        <div className="text-sm text-muted-foreground">
+                          {scores?.find((s) => s.teamId === match.team2Id)?.runs ?? 0}/
+                          {scores?.find((s) => s.teamId === match.team2Id)?.wickets ?? 0}
+                          ({scores?.find((s) => s.teamId === match.team2Id)?.overs ?? 0} overs)
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">No scorecard data available</p>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <h3 className="text-lg font-medium mb-2">Result</h3>
+                      <div className="text-sm">
+                        {match.result || "Match result not available"}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -243,13 +318,13 @@ export default function MatchDetail() {
                                 {ball.isWicket && (
                                   <span className="text-red-600 font-medium"> - WICKET!</span>
                                 )}
-                                {ball.extras > 0 && (
+                                {ball.extras && ball.extras > 0 && (
                                   <span className="text-blue-600"> + {ball.extras} extra{ball.extras !== 1 ? 's' : ''}</span>
                                 )}
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {new Date(ball.timestamp!).toLocaleTimeString()}
+                              {ball.timestamp && new Date(ball.timestamp).toLocaleTimeString()}
                             </div>
                           </div>
                         </div>
@@ -262,39 +337,10 @@ export default function MatchDetail() {
                   )}
                 </CardContent>
               </Card>
-
-              {latestBall && match.status === "live" && (
-                <Card className="border-primary">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                      Latest Ball
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg">
-                      Over {latestBall.over}.{latestBall.ball} - {latestBall.runs} run{latestBall.runs !== 1 ? 's' : ''}
-                      {latestBall.isWicket && (
-                        <span className="text-red-600 font-bold"> - WICKET!</span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </TabsContent>
 
             <TabsContent value="statistics" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Match Statistics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Detailed statistics will be available here</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <PlayerMatchStats matchId={parseInt(id!)} />
             </TabsContent>
 
             {canManageMatch && (

@@ -62,7 +62,17 @@ export default function AuthPage() {
   };
 
   if (user) {
-    return <Redirect to="/dashboard" />;
+    // Role-based redirection
+    switch (user.role) {
+      case 'organizer':
+      case 'admin':
+        return <Redirect to="/dashboard" />;
+      case 'player':
+        return <Redirect to="/player" />;
+      case 'fan':
+      default:
+        return <Redirect to="/home" />;
+    }
   }
 
   return (

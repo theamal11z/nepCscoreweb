@@ -6,7 +6,7 @@ import { insertTeamSchema, insertMatchSchema, insertPlayerSchema, insertMatchSco
 import { z } from "zod";
 
 function requireAuth(req: any, res: any, next: any) {
-  if (!req.isAuthenticated()) {
+  if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ message: "Authentication required" });
   }
   next();
@@ -14,7 +14,7 @@ function requireAuth(req: any, res: any, next: any) {
 
 function requireRole(roles: string[]) {
   return (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated()) {
+    if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Authentication required" });
     }
     if (!roles.includes(req.user.role)) {
@@ -42,7 +42,7 @@ export function registerRoutes(app: Express): Server {
       const validatedData = insertTeamSchema.parse(req.body);
       const team = await storage.createTeam({
         ...validatedData,
-        createdById: req.user.id,
+        createdById: req.user!.id,
       });
       res.status(201).json(team);
     } catch (error) {
@@ -67,9 +67,14 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/teams/my", requireAuth, async (req, res) => {
     try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
       const teams = await storage.getUserTeams(req.user.id);
-      res.json(teams);
+      res.json(teams || []);
     } catch (error) {
+      console.error("Error fetching user teams:", error);
       res.status(500).json({ message: "Failed to fetch user teams" });
     }
   });
@@ -77,38 +82,83 @@ export function registerRoutes(app: Express): Server {
   // Matches
   app.get("/api/matches", async (req, res) => {
     try {
-      const { status } = req.query;
-      let matches;
-      
-      if (status === "live") {
-        matches = await storage.getLiveMatches();
-      } else if (status === "upcoming") {
-        matches = await storage.getUpcomingMatches();
-      } else if (status === "completed") {
-        matches = await storage.getCompletedMatches();
-      } else {
-        matches = await storage.getAllMatches();
-      }
-      
+      const matches = await storage.getAllMatches();
       res.json(matches);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch matches" });
     }
   });
+  
+  // Live matches
+  app.get("/api/matches/live", async (req, res) => {
+    try {
+      const matches = await storage.getLiveMatches();
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch live matches" });
+    }
+  });
+  
+  // Upcoming matches
+  app.get("/api/matches/upcoming", async (req, res) => {
+    try {
+      const matches = await storage.getUpcomingMatches();
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch upcoming matches" });
+    }
+  });
+  
+  // Completed matches
+  app.get("/api/matches/completed", async (req, res) => {
+    try {
+      const matches = await storage.getCompletedMatches();
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch completed matches" });
+    }
+  });
+  
+  // Organizer matches - matches created by the logged-in organizer
+  app.get("/api/matches/organizer", requireAuth, requireRole(["organizer"]), async (req, res) => {
+    try {
+      const matches = await storage.getUserMatches(req.user!.id);
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch match" });
+    }
+  });
 
   app.post("/api/matches", requireAuth, requireRole(["organizer", "admin"]), async (req, res) => {
     try {
+      console.log('Match creation request body:', JSON.stringify(req.body));
       const validatedData = insertMatchSchema.parse(req.body);
-      const match = await storage.createMatch({
+      console.log('Validated match data:', JSON.stringify(validatedData));
+      
+      // Ensure numeric fields are properly converted
+      const matchData = {
         ...validatedData,
-        organizerId: req.user.id,
-      });
-      res.status(201).json(match);
+        team1Id: Number(validatedData.team1Id),
+        team2Id: Number(validatedData.team2Id),
+        organizerId: req.user!.id,
+      };
+      console.log('Creating match with data:', JSON.stringify(matchData));
+      
+      try {
+        const match = await storage.createMatch(matchData);
+        console.log('Match created successfully:', JSON.stringify(match));
+        res.status(201).json(match);
+      } catch (dbError) {
+        console.error('Database error creating match:', dbError);
+        res.status(500).json({ message: "Database error creating match", error: dbError instanceof Error ? dbError.message : String(dbError) });
+      }
     } catch (error) {
+      console.error('Error in match creation:', error);
       if (error instanceof z.ZodError) {
+        console.log('Validation errors:', error.errors);
         return res.status(400).json({ message: "Invalid match data", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create match" });
+      res.status(500).json({ message: "Failed to create match", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -126,7 +176,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/matches/organizer", requireAuth, async (req, res) => {
     try {
-      const matches = await storage.getUserMatches(req.user.id);
+      const matches = await storage.getUserMatches(req.user!.id);
       res.json(matches);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch organizer matches" });
@@ -240,7 +290,7 @@ export function registerRoutes(app: Express): Server {
       const validatedData = insertPlayerSchema.parse(req.body);
       const player = await storage.createPlayer({
         ...validatedData,
-        userId: req.user.id,
+        userId: req.user!.id,
       });
       res.status(201).json(player);
     } catch (error) {
@@ -250,10 +300,56 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to create player profile" });
     }
   });
+  
+  // Update player's team
+  app.patch("/api/players/:id/team", requireAuth, requireRole(["organizer", "admin"]), async (req, res) => {
+    try {
+      const playerId = parseInt(req.params.id);
+      const { teamId } = req.body;
+      
+      if (teamId === undefined) {
+        return res.status(400).json({ message: "Team ID is required" });
+      }
+      
+      // If organizer, check if they own the team
+      if (req.user!.role === "organizer") {
+        const team = await storage.getTeam(teamId);
+        if (!team || team.createdById !== req.user!.id) {
+          return res.status(403).json({ message: "You don't have permission to add players to this team" });
+        }
+      }
+      
+      await storage.updatePlayerTeam(playerId, teamId);
+      res.json({ message: "Player team updated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update player team" });
+    }
+  });
+  
+  // Get team players
+  app.get("/api/teams/:id/players", async (req, res) => {
+    try {
+      const teamId = parseInt(req.params.id);
+      const players = await storage.getTeamPlayers(teamId);
+      res.json(players);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch team players" });
+    }
+  });
+  
+  // Get available players (players without a team)
+  app.get("/api/players/available", requireAuth, requireRole(["organizer", "admin"]), async (req, res) => {
+    try {
+      const availablePlayers = await storage.getPlayersWithoutTeam();
+      res.json(availablePlayers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch available players" });
+    }
+  });
 
   app.get("/api/players/me", requireAuth, async (req, res) => {
     try {
-      const player = await storage.getPlayerByUserId(req.user.id);
+      const player = await storage.getPlayerByUserId(req.user!.id);
       res.json(player || null);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch player profile" });
@@ -327,6 +423,132 @@ export function registerRoutes(app: Express): Server {
       res.json({ message: "Player approval updated" });
     } catch (error) {
       res.status(500).json({ message: "Failed to update player approval" });
+    }
+  });
+  
+  // User profile update
+  app.patch("/api/users/profile", requireAuth, async (req, res) => {
+    try {
+      const { fullName, email, phone, bio } = req.body;
+      // Validate data
+      if (!fullName) {
+        return res.status(400).json({ message: "Full name is required" });
+      }
+      
+      // Validate email format
+      if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      // Check if email already exists for another user
+      if (email && email !== req.user!.email) {
+        const existingUser = await storage.getUserByEmail(email);
+        if (existingUser && existingUser.id !== req.user!.id) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+      }
+
+      // Update the user profile
+      await storage.updateUserProfile(req.user!.id, { fullName, email, phone, bio });
+      
+      // Get the updated user data
+      const updatedUser = await storage.getUser(req.user!.id);
+      
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+  
+  // Fan routes - Team and Player following
+  app.get("/api/fan/:userId/followed-teams", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const teams = await storage.getFollowedTeams(userId);
+      res.json(teams);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch followed teams" });
+    }
+  });
+  
+  app.get("/api/fan/:userId/followed-players", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const players = await storage.getFollowedPlayers(userId);
+      res.json(players);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch followed players" });
+    }
+  });
+  
+  // Current user's followed teams and players
+  app.get("/api/user/followed-teams", requireAuth, async (req, res) => {
+    try {
+      const teams = await storage.getFollowedTeams(req.user!.id);
+      res.json(teams);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch followed teams" });
+    }
+  });
+
+  app.get("/api/user/followed-players", requireAuth, async (req, res) => {
+    try {
+      const players = await storage.getFollowedPlayers(req.user!.id);
+      res.json(players);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch followed players" });
+    }
+  });
+  
+  app.post("/api/fan/follow-team", requireAuth, requireRole(["fan"]), async (req, res) => {
+    try {
+      const { teamId } = req.body;
+      if (!teamId) {
+        return res.status(400).json({ message: "Team ID is required" });
+      }
+      const follow = await storage.followTeam(req.user!.id, teamId);
+      res.status(201).json(follow);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to follow team" });
+    }
+  });
+  
+  app.post("/api/fan/unfollow-team", requireAuth, requireRole(["fan"]), async (req, res) => {
+    try {
+      const { teamId } = req.body;
+      if (!teamId) {
+        return res.status(400).json({ message: "Team ID is required" });
+      }
+      await storage.unfollowTeam(req.user!.id, teamId);
+      res.json({ message: "Successfully unfollowed team" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unfollow team" });
+    }
+  });
+  
+  app.post("/api/fan/follow-player", requireAuth, requireRole(["fan"]), async (req, res) => {
+    try {
+      const { playerId } = req.body;
+      if (!playerId) {
+        return res.status(400).json({ message: "Player ID is required" });
+      }
+      const follow = await storage.followPlayer(req.user!.id, playerId);
+      res.status(201).json(follow);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to follow player" });
+    }
+  });
+  
+  app.post("/api/fan/unfollow-player", requireAuth, requireRole(["fan"]), async (req, res) => {
+    try {
+      const { playerId } = req.body;
+      if (!playerId) {
+        return res.status(400).json({ message: "Player ID is required" });
+      }
+      await storage.unfollowPlayer(req.user!.id, playerId);
+      res.json({ message: "Successfully unfollowed player" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unfollow player" });
     }
   });
 

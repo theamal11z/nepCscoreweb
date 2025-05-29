@@ -19,10 +19,11 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 const matchFormSchema = insertMatchSchema.extend({
-  description: z.string().optional(),
+  status: z.string().optional()
 });
 
 type MatchFormData = z.infer<typeof matchFormSchema>;
+type FixedFormType = z.infer<typeof insertMatchSchema> & { status?: string };
 
 export default function MatchManagement() {
   const { user } = useAuth();
@@ -37,22 +38,28 @@ export default function MatchManagement() {
     queryKey: ["/api/teams"],
   });
 
-  const form = useForm<MatchFormData>({
-    resolver: zodResolver(matchFormSchema),
+  const form = useForm<FixedFormType>({
+    resolver: zodResolver(matchFormSchema as any),
     defaultValues: {
       team1Id: undefined,
       team2Id: undefined,
       venue: "",
       matchDate: "",
+      matchType: "",
       status: "scheduled",
-      description: "",
     },
   });
 
   const createMatchMutation = useMutation({
-    mutationFn: async (data: MatchFormData) => {
+    mutationFn: async (data: any) => {
+      console.log('Sending to API:', data);
       const res = await apiRequest("POST", "/api/matches", data);
-      return await res.json();
+      const result = await res.json();
+      console.log('API response:', result);
+      if (!res.ok) {
+        throw new Error(result.message || 'Failed to create match');
+      }
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
@@ -95,8 +102,37 @@ export default function MatchManagement() {
     },
   });
 
-  const onCreateMatch = (data: MatchFormData) => {
-    createMatchMutation.mutate(data);
+  const onCreateMatch = (data: FixedFormType) => {
+    // Make sure we have a valid date format for the server
+    console.log('Form data before submission:', data);
+    
+    try {
+      // Make sure date is in ISO format
+      if (data.matchDate) {
+        // Create a proper match payload
+        const matchData = {
+          ...data,
+          team1Id: Number(data.team1Id),
+          team2Id: Number(data.team2Id),
+          matchDate: new Date(data.matchDate).toISOString()
+        };
+        console.log('Submitting match data:', matchData);
+        createMatchMutation.mutate(matchData);
+      } else {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid match date and time",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error('Error processing form data:', err);
+      toast({
+        title: "Error",
+        description: "There was an error processing your form data",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -167,7 +203,7 @@ export default function MatchManagement() {
                 <DialogTitle>Create New Match</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onCreateMatch)} className="space-y-6">
+                <form onSubmit={form.handleSubmit(onCreateMatch as any)} className="space-y-6">
                   <FormField
                     control={form.control}
                     name="team1Id"
@@ -251,12 +287,24 @@ export default function MatchManagement() {
                   
                   <FormField
                     control={form.control}
-                    name="description"
+                    name="matchType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormLabel>Match Type</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Enter match description" {...field} />
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select match type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="T20">T20</SelectItem>
+                              <SelectItem value="ODI">ODI</SelectItem>
+                              <SelectItem value="Test">Test</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -293,7 +341,7 @@ export default function MatchManagement() {
                   <CardTitle className="text-lg">
                     {getTeamName(match.team1Id)} vs {getTeamName(match.team2Id)}
                   </CardTitle>
-                  {getStatusBadge(match.status)}
+                  {getStatusBadge(match.status || 'scheduled')}
                 </div>
                 <CardDescription className="space-y-2">
                   <div className="flex items-center space-x-2">
@@ -308,11 +356,6 @@ export default function MatchManagement() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {match.description && (
-                    <p className="text-gray-700 dark:text-gray-300 text-sm">
-                      {match.description}
-                    </p>
-                  )}
                   
                   <div className="flex justify-between items-center">
                     <div className="flex space-x-2">
